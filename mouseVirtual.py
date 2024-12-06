@@ -7,7 +7,7 @@ import math  # Untuk menghitung jarak antara dua titik
 cam = cv.VideoCapture(0)
 
 mphands = mp.solutions.hands
-hands = mphands.Hands(max_num_hands=1, min_detection_confidence=0.7, min_tracking_confidence=0.7)
+hands = mphands.Hands(max_num_hands=1, min_detection_confidence=0.8, min_tracking_confidence=0.8)
 mpDraw = mp.solutions.drawing_utils
 
 screenWidth, screenHeight = pg.size()  # Ukuran layar
@@ -19,7 +19,7 @@ tipid = [4, 8, 12, 16, 20]  # ID ujung jari sesuai MediaPipe
 
 # Variabel untuk pergerakan kursor yang halus
 prevX, prevY = 0, 0
-smooth_factor = 0.2  # Nilai 0-1, semakin kecil semakin halus
+smooth_factor = 0.5  # Nilai 0-1, semakin kecil semakin halus
 
 while True:
     success, img = cam.read()
