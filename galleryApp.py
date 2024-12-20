@@ -1,115 +1,203 @@
-from customtkinter import *
-from tkinter import filedialog, Canvas, Scrollbar
+import customtkinter
+from tkinter import filedialog
 from PIL import Image, ImageTk
 import os
 
-# Inisialisasi aplikasi
-app = CTk()
-app.geometry("700x700")
-app.title("Gallery")
+folder = "gallery_photos"
+checkboxes = {}
+delete_mode = False  # Untuk melacak apakah dalam mode delete
 
-# Direktori untuk menyimpan foto
-GALLERY_DIR = "gallery_photos"
-os.makedirs(GALLERY_DIR, exist_ok=True)
+# Fungsi untuk memuat foto dari folder
+def load_photos():
+    if not os.path.exists(folder):
+        os.makedirs(folder)  # Jika folder tidak ada, buat folder
+
+    for widget in appFrame.winfo_children():
+        widget.destroy()
+
+    frame_width = appFrame.winfo_width()
+
+    if frame_width >= 1200:
+        columns = 8
+    elif frame_width >= 600:
+        columns = 4
+    elif frame_width >= 400:
+        columns = 3
+    elif frame_width >= 200:
+        columns = 3
+    else:
+        columns = 2
+
+    padding = 10
+    row = 0
+    col = 0
+
+    checkboxes.clear()
+
+    for filename in os.listdir(folder):
+        if filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp")):
+            filepath = os.path.join(folder, filename)
+            try:
+                img = Image.open(filepath)
+                photo = customtkinter.CTkImage(img, size=(150, 150))
+
+                photo_frame = customtkinter.CTkFrame(appFrame, fg_color="transparent")
+                photo_frame.grid(row=row, column=col, padx=padding, pady=padding)
+
+                img_label = customtkinter.CTkLabel(photo_frame, image=photo, text="")
+                img_label.image = photo
+                img_label.pack()
+
+                var = customtkinter.BooleanVar()
+                checkbox = customtkinter.CTkCheckBox(
+                    photo_frame, text="", variable=var
+                )
+                checkbox.pack(pady=5)
+
+                checkboxes[filepath] = {'var': var, 'checkbox': checkbox}
+
+                checkbox.pack_forget()  # Sembunyikan checkbox secara default
+
+                col += 1
+                if col >= columns:
+                    col = 0
+                    row += 1
+            except Exception as e:
+                print(f"Error loading {filename}: {e}")
+
+# Fungsi untuk memonitor perubahan ukuran frame
+def monitor_frame_size():
+    global last_frame_width
+
+    current_width = appFrame.winfo_width()
+
+    if current_width != last_frame_width:
+        last_frame_width = current_width
+        load_photos()
+
+    app.after(100, monitor_frame_size)
 
 # Fungsi untuk mengunggah gambar
 def upload_photo():
+    if uploadBtn.cget("text") == "Cancel":
+        cancel_selection()  # Batalkan semua centangan dan sembunyikan checkbox
+        return
+
     file_path = filedialog.askopenfilename(
         filetypes=[("Image files", "*.jpg;*.jpeg;*.png;*.bmp")]
     )
     if file_path:
         file_name = os.path.basename(file_path)
-        dest_path = os.path.join(GALLERY_DIR, file_name)
+        dest_path = os.path.join(folder, file_name)
         if not os.path.exists(dest_path):
             Image.open(file_path).save(dest_path)
-        load_images()
+        load_photos()
 
-# Fungsi untuk menghapus gambar
-def delete_photo(image_path):
-    if os.path.exists(image_path):
-        os.remove(image_path)
-        load_images()
+# Fungsi untuk toggle mode Select/Delete
+def toggle_select_mode():
+    global delete_mode
+    delete_mode = not delete_mode
 
-# Fungsi untuk memuat dan menampilkan gambar
-def load_images():
-    for widget in canvas_frame.winfo_children():
-        widget.destroy()
+    if delete_mode:
+        selectBtn.configure(text="Delete", command=delete_photos)
+        for data in checkboxes.values():
+            data['checkbox'].pack()  # Tampilkan checkbox
+        uploadBtn.configure(text="Cancel")
+    else:
+        selectBtn.configure(text="Select", command=toggle_select_mode)
+        for data in checkboxes.values():
+            data['checkbox'].pack_forget()  # Sembunyikan checkbox
+        uploadBtn.configure(text="Upload")
 
-    images = [
-        os.path.join(GALLERY_DIR, img) for img in os.listdir(GALLERY_DIR)
-        if img.lower().endswith((".jpg", ".jpeg", ".png", ".bmp"))
-    ]
+# Fungsi untuk menghapus foto yang dipilih
+def delete_photos():
+    global delete_mode
 
-    row, col = 0, 0
-    for image_path in images:
-        try:
-            img = Image.open(image_path)
-            img.thumbnail((150, 150))
-            photo = ImageTk.PhotoImage(img)
+    for filepath, data in checkboxes.items():
+        if data['var'].get():
+            try:
+                os.remove(filepath)
+            except Exception as e:
+                print(f"Error deleting {filepath}: {e}")
 
-            frame = CTkFrame(master=canvas_frame, corner_radius=10)
-            frame.grid(row=row, column=col, padx=10, pady=10)
+    delete_mode = False
+    selectBtn.configure(text="Select", command=toggle_select_mode)
+    uploadBtn.configure(text="Upload")
+    load_photos()
 
-            img_label = CTkLabel(master=frame, image=photo, text="")
-            img_label.image = photo  # Simpan referensi agar tidak dihapus oleh garbage collector
-            img_label.pack()
+# Fungsi untuk membatalkan semua centangan dan sembunyikan checkbox
+def cancel_selection():
+    for data in checkboxes.values():
+        data['var'].set(False)  # Hapus centangan
+        data['checkbox'].pack_forget()  # Sembunyikan checkbox
+    uploadBtn.configure(text="Upload")  # Ubah tombol kembali ke Upload
+    selectBtn.configure(text="Select", command=toggle_select_mode)
 
-            delete_btn = CTkButton(
-                master=frame,
-                text="Delete",
-                fg_color="#e74c3c",
-                hover_color="#c0392b",
-                command=lambda path=image_path: delete_photo(path)
-            )
-            delete_btn.pack(pady=5)
+# Fungsi untuk memantau checkbox dan mengubah tombol upload menjadi cancel
+def monitor_checkboxes():
+    if any(data['var'].get() for data in checkboxes.values()):
+        uploadBtn.configure(text="Cancel")
+    else:
+        uploadBtn.configure(text="Upload")
 
-            col += 1
-            if col >= 4:  # 4 gambar per baris
-                col = 0
-                row += 1
-        except Exception as e:
-            print(f"Error loading image {image_path}: {e}")
+    app.after(100, monitor_checkboxes)
 
-    canvas.update_idletasks()
-    canvas.config(scrollregion=canvas.bbox("all"))
+# Inisialisasi aplikasi
+app = customtkinter.CTk()
+app.geometry("700x600")
+app.title("Gallery")
 
-# Header frame
-header = CTkFrame(master=app, height=50, corner_radius=0, fg_color="#2c3e50")
-header.pack(fill="x", side="top")
-
-header_label = CTkLabel(
-    master=header,
-    text="MyGallery",
-    text_color="white",
-    font=("Arial", 18)
+header = customtkinter.CTkFrame(
+    app, 
+    fg_color="lightblue",
+    width=700,
+    height=40
 )
-header_label.pack(side="left", padx=20, pady=10)
+header.grid_columnconfigure(0, weight=1)
+header.grid_columnconfigure(1, weight=0)
+header.grid_columnconfigure(2, weight=0)
+header.pack(pady=5, fill="x")
 
-uploadBtn = CTkButton(
+header_text = customtkinter.CTkLabel(
+    master=header,
+    text="My Gallery",
+    font=("Arial", 16, "bold"),
+    text_color="black",
+    anchor="w"
+)
+header_text.grid(row=0, column=0, padx=10, sticky="w")
+
+uploadBtn = customtkinter.CTkButton(
     master=header,
     text="Upload",
-    corner_radius=32,
-    fg_color="#5091bf",
     hover_color="#3b47d1",
     width=100,
+    height=30,
     command=upload_photo
 )
-uploadBtn.pack(side="right", padx=20, pady=10)
+uploadBtn.grid(row=0, column=1, padx=10, pady=5, sticky="e")
 
-# Canvas untuk scroll
-canvas = Canvas(app, bg="#f0f0f0")
-canvas.pack(side=LEFT, fill=BOTH, expand=True)
+selectBtn = customtkinter.CTkButton(
+    master=header,
+    text="Select",
+    hover_color="#3b47d1",
+    width=100,
+    height=30,
+    command=toggle_select_mode
+)
+selectBtn.grid(row=0, column=2, padx=10, pady=5, sticky="e")
 
-scrollbar = Scrollbar(app, orient=VERTICAL, command=canvas.yview)
-scrollbar.pack(side=RIGHT, fill=Y)
+appFrame = customtkinter.CTkScrollableFrame(
+    app,
+    width=700,
+    height=800
+)
+appFrame.pack(pady=10, fill="both", expand=True)
 
-canvas.configure(yscrollcommand=scrollbar.set)
+last_frame_width = appFrame.winfo_width()
 
-canvas_frame = CTkFrame(canvas)
-canvas.create_window((0, 0), window=canvas_frame, anchor="nw")
+load_photos()
+monitor_frame_size()
+monitor_checkboxes()
 
-# Load gambar saat aplikasi dijalankan
-load_images()
-
-# Menjalankan aplikasi
 app.mainloop()

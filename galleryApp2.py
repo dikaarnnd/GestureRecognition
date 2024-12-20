@@ -4,20 +4,19 @@ from PIL import Image, ImageTk
 import os
 
 folder = "gallery_photos"
+checkboxes = {}
+delete_mode = False  # Untuk melacak apakah dalam mode delete
 
 # Fungsi untuk memuat foto dari folder
 def load_photos():
-    if not os.path.exists(folder):  # Periksa apakah folder ada
-        os.makedirs(folder)  # Jika tidak, buat folder
+    if not os.path.exists(folder):
+        os.makedirs(folder)  # Jika folder tidak ada, buat folder
 
-    for widget in appFrame.winfo_children():  # Hapus widget sebelumnya
+    for widget in appFrame.winfo_children():
         widget.destroy()
 
-    # Dapatkan lebar aplikasi saat ini
     frame_width = appFrame.winfo_width()
-    # print(frame_width)
 
-    # Tentukan jumlah kolom berdasarkan ukuran lebar frame
     if frame_width >= 1200:
         columns = 8
     elif frame_width >= 600:
@@ -29,27 +28,36 @@ def load_photos():
     else:
         columns = 2
 
-    padding = 10  # Padding antar gambar
+    padding = 10
     row = 0
     col = 0
 
-    # Loop untuk membaca file gambar di folder
+    checkboxes.clear()
+
     for filename in os.listdir(folder):
         if filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp")):
             filepath = os.path.join(folder, filename)
             try:
-                # Buka gambar
                 img = Image.open(filepath)
-
-                # Tentukan ukuran gambar (150x150px)
                 photo = customtkinter.CTkImage(img, size=(150, 150))
 
-                # Label gambar
-                img_label = customtkinter.CTkLabel(appFrame, image=photo, text="")
-                img_label.image = photo  # Simpan referensi gambar agar tidak dihapus
-                img_label.grid(row=row, column=col, padx=padding, pady=padding)
+                photo_frame = customtkinter.CTkFrame(appFrame, fg_color="transparent")
+                photo_frame.grid(row=row, column=col, padx=padding, pady=padding)
 
-                # Perbarui posisi kolom dan baris
+                img_label = customtkinter.CTkLabel(photo_frame, image=photo, text="")
+                img_label.image = photo
+                img_label.pack()
+
+                var = customtkinter.BooleanVar()
+                checkbox = customtkinter.CTkCheckBox(
+                    photo_frame, text="", variable=var
+                )
+                checkbox.pack(pady=5)
+
+                checkboxes[filepath] = {'var': var, 'checkbox': checkbox}
+
+                checkbox.pack_forget()  # Sembunyikan checkbox secara default
+
                 col += 1
                 if col >= columns:
                     col = 0
@@ -61,19 +69,20 @@ def load_photos():
 def monitor_frame_size():
     global last_frame_width
 
-    # Periksa lebar frame saat ini
     current_width = appFrame.winfo_width()
 
-    # Jika lebar frame berubah, panggil load_photos()
     if current_width != last_frame_width:
         last_frame_width = current_width
         load_photos()
 
-    # Jalankan fungsi ini lagi setelah 100ms
     app.after(100, monitor_frame_size)
 
 # Fungsi untuk mengunggah gambar
 def upload_photo():
+    if uploadBtn.cget("text") == "Cancel":
+        cancel_selection()  # Batalkan semua centangan dan sembunyikan checkbox
+        return
+
     file_path = filedialog.askopenfilename(
         filetypes=[("Image files", "*.jpg;*.jpeg;*.png;*.bmp")]
     )
@@ -84,35 +93,80 @@ def upload_photo():
             Image.open(file_path).save(dest_path)
         load_photos()
 
+# Fungsi untuk toggle mode Select/Delete
+def toggle_select_mode():
+    global delete_mode
+    delete_mode = not delete_mode
+
+    if delete_mode:
+        selectBtn.configure(text="Delete", command=delete_photos)
+        for data in checkboxes.values():
+            data['checkbox'].pack()  # Tampilkan checkbox
+        uploadBtn.configure(text="Cancel")
+    else:
+        selectBtn.configure(text="Select", command=toggle_select_mode)
+        for data in checkboxes.values():
+            data['checkbox'].pack_forget()  # Sembunyikan checkbox
+        uploadBtn.configure(text="Upload")
+
+# Fungsi untuk menghapus foto yang dipilih
+def delete_photos():
+    global delete_mode
+
+    for filepath, data in checkboxes.items():
+        if data['var'].get():
+            try:
+                os.remove(filepath)
+            except Exception as e:
+                print(f"Error deleting {filepath}: {e}")
+
+    delete_mode = False
+    selectBtn.configure(text="Select", command=toggle_select_mode)
+    uploadBtn.configure(text="Upload")
+    load_photos()
+
+# Fungsi untuk membatalkan semua centangan dan sembunyikan checkbox
+def cancel_selection():
+    for data in checkboxes.values():
+        data['var'].set(False)  # Hapus centangan
+        data['checkbox'].pack_forget()  # Sembunyikan checkbox
+    uploadBtn.configure(text="Upload")  # Ubah tombol kembali ke Upload
+    selectBtn.configure(text="Select", command=toggle_select_mode)
+
+# Fungsi untuk memantau checkbox dan mengubah tombol upload menjadi cancel
+def monitor_checkboxes():
+    if any(data['var'].get() for data in checkboxes.values()):
+        uploadBtn.configure(text="Cancel")
+    else:
+        uploadBtn.configure(text="Upload")
+
+    app.after(100, monitor_checkboxes)
+
 # Inisialisasi aplikasi
 app = customtkinter.CTk()
 app.geometry("700x600")
 app.title("Gallery")
 
-# Header
 header = customtkinter.CTkFrame(
     app, 
     fg_color="lightblue",
     width=700,
     height=40
 )
-# Kolom header
-header.grid_columnconfigure(0, weight=1)  # Kolom teks
-header.grid_columnconfigure(1, weight=0)  # Kolom tombol upload
-header.grid_columnconfigure(2, weight=0)  # Kolom tombol select
-header.pack(pady=5, fill="x")  # Atur header agar mengisi lebar penuh aplikasi
+header.grid_columnconfigure(0, weight=1)
+header.grid_columnconfigure(1, weight=0)
+header.grid_columnconfigure(2, weight=0)
+header.pack(pady=5, fill="x")
 
-# Header untuk teks
 header_text = customtkinter.CTkLabel(
     master=header,
     text="My Gallery",
     font=("Arial", 16, "bold"),
     text_color="black",
-    anchor="w"  # Posisi teks di kiri
+    anchor="w"
 )
-header_text.grid(row=0, column=0, padx=10, sticky="w")  # sticky="w" teks tetap di kiri
+header_text.grid(row=0, column=0, padx=10, sticky="w")
 
-# Upload Button di Header
 uploadBtn = customtkinter.CTkButton(
     master=header,
     text="Upload",
@@ -121,20 +175,18 @@ uploadBtn = customtkinter.CTkButton(
     height=30,
     command=upload_photo
 )
-uploadBtn.grid(row=0, column=1, padx=10, pady=5, sticky="e")  # sticky="e" agar tombol tetap di kanan
+uploadBtn.grid(row=0, column=1, padx=10, pady=5, sticky="e")
 
-# Select Button di Header
-selectdBtn = customtkinter.CTkButton(
+selectBtn = customtkinter.CTkButton(
     master=header,
     text="Select",
     hover_color="#3b47d1",
     width=100,
-    height=30
-    # command=select_photo
+    height=30,
+    command=toggle_select_mode
 )
-selectdBtn.grid(row=0, column=2, padx=10, pady=5, sticky="e")  # sticky="e" agar tombol tetap di kanan
+selectBtn.grid(row=0, column=2, padx=10, pady=5, sticky="e")
 
-# Scrollable Frame
 appFrame = customtkinter.CTkScrollableFrame(
     app,
     width=700,
@@ -142,14 +194,10 @@ appFrame = customtkinter.CTkScrollableFrame(
 )
 appFrame.pack(pady=10, fill="both", expand=True)
 
-# Inisialisasi variabel untuk memantau ukuran frame
 last_frame_width = appFrame.winfo_width()
 
-# Panggil fungsi load_photos() untuk pertama kali
 load_photos()
-
-# Memonitor perubahan ukuran frame
 monitor_frame_size()
+monitor_checkboxes()
 
-# Menjalankan aplikasi
 app.mainloop()
