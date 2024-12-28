@@ -99,10 +99,11 @@ while True:
             
             # Scroll: Jika tiga jari terangkat (telunjuk, tengah, manis)
             if fingers[1] == 1 and fingers[2] == 1 and fingers[3] == 1 and fingers[4] == 0:
-                cv.putText(img, f'Scrolling ({hand_label})', (10, 50), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv.LINE_AA)
                 if lmlist[tipid[1]][2] < h // 2:
+                    cv.putText(img, 'Scroll ke atas', (w - 300, 50), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv.LINE_AA)
                     pg.scroll(scroll_speed)  # Scroll ke atas
                 else:
+                    cv.putText(img, 'Scroll ke bawah', (w - 300, 50), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv.LINE_AA)
                     pg.scroll(-scroll_speed)  # Scroll ke bawah
 
             # Kursor bergerak jika telunjuk dan jempol terangkat untuk masing-masing tangan
