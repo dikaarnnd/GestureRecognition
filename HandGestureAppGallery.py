@@ -12,7 +12,7 @@ import os
 folder = "gallery_photos"
 checkboxes = {}
 delete_mode = False  # Untuk melacak apakah dalam mode delete
-hand_tracking_active = True  # Mengontrol status hand tracking
+# hand_tracking_active = True  # Mengontrol status hand tracking
 
 # --- Bagian MediaPipe untuk Deteksi Tangan ---
 def hand_tracking():
@@ -40,8 +40,8 @@ def hand_tracking():
     scale_factor_y = 0.5
 
     while True:
-        if not hand_tracking_active:
-            continue  # Hentikan hand tracking jika tidak aktif
+        # if not hand_tracking_active:
+        #     continue  # Hentikan hand tracking jika tidak aktif
         success, img = cam.read()
         img = cv.flip(img, 1)
         h, w, c = img.shape
@@ -158,13 +158,13 @@ def hand_tracking():
                         pg.moveTo(smoothX, smoothY, duration=0.01)
                         prev_positions["Left"] = (smoothX, smoothY)
 
-def on_focus_in(event):
-    global hand_tracking_active
-    hand_tracking_active = True  # Aktifkan hand tracking saat aplikasi mendapat fokus
+# def on_focus_in(event):
+#     global hand_tracking_active
+#     hand_tracking_active = True  # Aktifkan hand tracking saat aplikasi mendapat fokus
 
-def on_focus_out(event):
-    global hand_tracking_active
-    hand_tracking_active = False  # Matikan hand tracking saat aplikasi kehilangan fokus
+# def on_focus_out(event):
+#     global hand_tracking_active
+#     hand_tracking_active = False  # Matikan hand tracking saat aplikasi kehilangan fokus
 
 # --- Bagian CustomTkinter untuk Aplikasi Gallery ---
 # Fungsi untuk memuat foto dari folder
@@ -313,8 +313,8 @@ app = customtkinter.CTk()
 app.geometry("700x600")
 app.title("Gallery")
 
-app.bind("<FocusIn>", on_focus_in)
-app.bind("<FocusOut>", on_focus_out)
+# app.bind("<FocusIn>", on_focus_in)
+# app.bind("<FocusOut>", on_focus_out)
 
 header = customtkinter.CTkFrame(
     app, 
