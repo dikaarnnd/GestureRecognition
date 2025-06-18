@@ -6,12 +6,12 @@ import mysql.connector
 
 checkboxes = {}
 delete_mode = False
-is_fullscreen_preview = False
+is_fullscreen_preview = False  # Status preview fullscreen aktif/tidak
 
 def get_db_connection():
     return mysql.connector.connect(
         host="localhost",
-        user="root", 
+        user="root",
         password="",
         database="gallery_app"
     )
@@ -66,7 +66,6 @@ def load_photos():
     padding = 10
     row = 0
     col = 0
-
     checkboxes.clear()
 
     conn = get_db_connection()
@@ -76,7 +75,7 @@ def load_photos():
     conn.close()
 
     for img_id, filepath in image_entries:
-        if os.path.exists(filepath):  # pastikan path masih valid
+        if os.path.exists(filepath):
             try:
                 img = Image.open(filepath)
                 photo = customtkinter.CTkImage(img, size=(150, 150))
@@ -92,14 +91,13 @@ def load_photos():
                 var = customtkinter.BooleanVar()
                 checkbox = customtkinter.CTkCheckBox(photo_frame, text="", variable=var)
                 checkbox.pack(pady=5)
+                checkbox.pack_forget()
 
                 checkboxes[img_id] = {
                     'var': var,
                     'checkbox': checkbox,
                     'filepath': filepath
                 }
-
-                checkbox.pack_forget()
 
                 col += 1
                 if col >= columns:
@@ -108,8 +106,6 @@ def load_photos():
             except Exception as e:
                 print(f"Error loading {filepath}: {e}")
 
-
-# Fungsi untuk memonitor perubahan ukuran frame
 def monitor_frame_size():
     global last_frame_width
     current_width = appFrame.winfo_width()
@@ -118,29 +114,20 @@ def monitor_frame_size():
         load_photos()
     app.after(100, monitor_frame_size)
 
-# Fungsi untuk mengunggah gambar
 def upload_photo():
     if uploadBtn.cget("text") == "Cancel":
         cancel_selection()
         return
 
-    file_path = filedialog.askopenfilename(
-        filetypes=[("Image files", "*.jpg;*.jpeg;*.png;*.bmp")]
-    )
+    file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg;*.jpeg;*.png;*.bmp")])
     if file_path:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO images (image_path) VALUES (%s)",
-            (file_path,)
-        )
+        cursor.execute("INSERT INTO images (image_path) VALUES (%s)", (file_path,))
         conn.commit()
         conn.close()
-
         load_photos()
 
-
-# Fungsi untuk toggle mode Select/Delete
 def toggle_select_mode():
     global delete_mode
     delete_mode = not delete_mode
@@ -148,25 +135,22 @@ def toggle_select_mode():
     if delete_mode:
         selectBtn.configure(text="Delete", command=delete_photos)
         for data in checkboxes.values():
-            data['checkbox'].pack()  # Tampilkan checkbox
+            data['checkbox'].pack()
         uploadBtn.configure(text="Cancel")
     else:
         selectBtn.configure(text="Select", command=toggle_select_mode)
         for data in checkboxes.values():
-            data['checkbox'].pack_forget()  # Sembunyikan checkbox
+            data['checkbox'].pack_forget()
         uploadBtn.configure(text="Upload")
 
-# Fungsi untuk menghapus foto yang dipilih
 def delete_photos():
     global delete_mode
-
     conn = get_db_connection()
     cursor = conn.cursor()
 
     for img_id, data in checkboxes.items():
         if data['var'].get():
             cursor.execute("DELETE FROM images WHERE id = %s", (img_id,))
-
     conn.commit()
     conn.close()
 
@@ -175,37 +159,27 @@ def delete_photos():
     uploadBtn.configure(text="Upload")
     load_photos()
 
-
-
-# Fungsi untuk membatalkan semua centangan dan sembunyikan checkbox
 def cancel_selection():
     for data in checkboxes.values():
-        data['var'].set(False)  # Hapus centangan
-        data['checkbox'].pack_forget()  # Sembunyikan checkbox
-    uploadBtn.configure(text="Upload")  # Ubah tombol kembali ke Upload
+        data['var'].set(False)
+        data['checkbox'].pack_forget()
+    uploadBtn.configure(text="Upload")
     selectBtn.configure(text="Select", command=toggle_select_mode)
 
-# Fungsi untuk memantau checkbox dan mengubah tombol upload menjadi cancel
 def monitor_checkboxes():
     if any(data['var'].get() for data in checkboxes.values()):
         uploadBtn.configure(text="Cancel")
     else:
         uploadBtn.configure(text="Upload")
-
     app.after(100, monitor_checkboxes)
 
-# Inisialisasi aplikasi
+# ==== Inisialisasi Aplikasi ====
 app = customtkinter.CTk()
-app.geometry("700x600")
+app.geometry("800x650")
 app.title("Gallery")
-app.bind("<Escape>", handle_escape)
+app.bind("<Escape>", handle_escape)  # Bind tombol ESC
 
-header = customtkinter.CTkFrame(
-    app, 
-    fg_color="lightblue",
-    width=700,
-    height=40
-)
+header = customtkinter.CTkFrame(app, fg_color="lightblue", height=40)
 header.grid_columnconfigure(0, weight=1)
 header.grid_columnconfigure(1, weight=0)
 header.grid_columnconfigure(2, weight=0)
@@ -228,7 +202,7 @@ uploadBtn = customtkinter.CTkButton(
     height=30,
     command=upload_photo
 )
-uploadBtn.grid(row=0, column=1, padx=10, pady=5, sticky="e")
+uploadBtn.grid(row=0, column=1, padx=10, pady=5)
 
 selectBtn = customtkinter.CTkButton(
     master=header,
@@ -238,21 +212,17 @@ selectBtn = customtkinter.CTkButton(
     height=30,
     command=toggle_select_mode
 )
-selectBtn.grid(row=0, column=2, padx=10, pady=5, sticky="e")
+selectBtn.grid(row=0, column=2, padx=10, pady=5)
 
-# Frame untuk preview fullscreen di dalam aplikasi
+# Preview Frame (fullscreen)
 previewFrame = customtkinter.CTkFrame(app, fg_color="transparent")
-previewFrame.pack_forget()  # disembunyikan dulu
+previewFrame.pack_forget()
 
-# Label gambar besar
 previewImageLabel = customtkinter.CTkLabel(previewFrame, text="")
-previewImageLabel.pack(expand=True, fill="both",pady=10)
+previewImageLabel.pack(expand=True)
 
-appFrame = customtkinter.CTkScrollableFrame(
-    app,
-    width=700,
-    height=800
-)
+# Grid Frame
+appFrame = customtkinter.CTkScrollableFrame(app, width=800, height=800)
 appFrame.pack(pady=10, fill="both", expand=True)
 
 last_frame_width = appFrame.winfo_width()
