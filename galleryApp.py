@@ -2,21 +2,27 @@ import customtkinter
 from tkinter import filedialog
 from PIL import Image, ImageTk
 import os
+import mysql.connector
 
-folder = "gallery_photos"
+
 checkboxes = {}
-delete_mode = False  # Untuk melacak apakah dalam mode delete
+delete_mode = False
 
-# Fungsi untuk memuat foto dari folder
+
+def get_db_connection():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root", 
+        password="root",
+        database="gallery_app"
+    )
+
+
 def load_photos():
-    if not os.path.exists(folder):
-        os.makedirs(folder)  # Jika folder tidak ada, buat folder
-
     for widget in appFrame.winfo_children():
         widget.destroy()
 
     frame_width = appFrame.winfo_width()
-
     if frame_width >= 1200:
         columns = 8
     elif frame_width >= 600:
@@ -34,9 +40,14 @@ def load_photos():
 
     checkboxes.clear()
 
-    for filename in os.listdir(folder):
-        if filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp")):
-            filepath = os.path.join(folder, filename)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, image_path FROM images")
+    image_entries = cursor.fetchall()
+    conn.close()
+
+    for img_id, filepath in image_entries:
+        if os.path.exists(filepath):  # pastikan path masih valid
             try:
                 img = Image.open(filepath)
                 photo = customtkinter.CTkImage(img, size=(150, 150))
@@ -49,21 +60,24 @@ def load_photos():
                 img_label.pack()
 
                 var = customtkinter.BooleanVar()
-                checkbox = customtkinter.CTkCheckBox(
-                    photo_frame, text="", variable=var
-                )
+                checkbox = customtkinter.CTkCheckBox(photo_frame, text="", variable=var)
                 checkbox.pack(pady=5)
 
-                checkboxes[filepath] = {'var': var, 'checkbox': checkbox}
+                checkboxes[img_id] = {
+                    'var': var,
+                    'checkbox': checkbox,
+                    'filepath': filepath
+                }
 
-                checkbox.pack_forget()  # Sembunyikan checkbox secara default
+                checkbox.pack_forget()
 
                 col += 1
                 if col >= columns:
                     col = 0
                     row += 1
             except Exception as e:
-                print(f"Error loading {filename}: {e}")
+                print(f"Error loading {filepath}: {e}")
+
 
 # Fungsi untuk memonitor perubahan ukuran frame
 def monitor_frame_size():
@@ -80,18 +94,24 @@ def monitor_frame_size():
 # Fungsi untuk mengunggah gambar
 def upload_photo():
     if uploadBtn.cget("text") == "Cancel":
-        cancel_selection()  # Batalkan semua centangan dan sembunyikan checkbox
+        cancel_selection()
         return
 
     file_path = filedialog.askopenfilename(
         filetypes=[("Image files", "*.jpg;*.jpeg;*.png;*.bmp")]
     )
     if file_path:
-        file_name = os.path.basename(file_path)
-        dest_path = os.path.join(folder, file_name)
-        if not os.path.exists(dest_path):
-            Image.open(file_path).save(dest_path)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO images (image_path) VALUES (%s)",
+            (file_path,)
+        )
+        conn.commit()
+        conn.close()
+
         load_photos()
+
 
 # Fungsi untuk toggle mode Select/Delete
 def toggle_select_mode():
@@ -113,17 +133,22 @@ def toggle_select_mode():
 def delete_photos():
     global delete_mode
 
-    for filepath, data in checkboxes.items():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    for img_id, data in checkboxes.items():
         if data['var'].get():
-            try:
-                os.remove(filepath)
-            except Exception as e:
-                print(f"Error deleting {filepath}: {e}")
+            cursor.execute("DELETE FROM images WHERE id = %s", (img_id,))
+
+    conn.commit()
+    conn.close()
 
     delete_mode = False
     selectBtn.configure(text="Select", command=toggle_select_mode)
     uploadBtn.configure(text="Upload")
     load_photos()
+
+
 
 # Fungsi untuk membatalkan semua centangan dan sembunyikan checkbox
 def cancel_selection():
